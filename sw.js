@@ -53,16 +53,28 @@ async function cacheZip(arrayBuffer) {
   await Promise.all(cachePromises);
 }
 
-// 拦截 fetch，优先从缓存读取
+// 拦截 fetch，优先从缓存读取，跳过 ZIP 文件请求
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // 跳过 ZIP 文件请求，直接走网络，不拦截
+  if (url.href.includes('flow.zip')) {
+    return; // 不处理
+  }
+
   event.respondWith(
-    caches.match(event.request).then(response => {
-      if (response) {
-        console.log('命中缓存:', event.request.url);
-        return response;
-      }
-      return fetch(event.request);
-    })
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          console.log('命中缓存:', event.request.url);
+          return response;
+        }
+        return fetch(event.request);
+      })
+      .catch(err => {
+        console.error('Fetch 失败:', err);
+        return fetch(event.request); // 如果缓存失败，强制兜底请求
+      })
   );
 });
 
