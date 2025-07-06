@@ -1,16 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <title>ZIP 多源缓存 Demo</title>
-</head>
 <body>
   <h1>ZIP 多源缓存 Demo</h1>
-  <button id="cacheZipBtn">下载并缓存 ZIP</button>
-  <p id="status">等待操作...</p>
+  <p id="status">正在初始化...</p>
 
   <script>
-    // ZIP 备用地址列表
     const zipUrls = [
       'https://m.wbiao.cn/mallapi/wechat/picReverseUrl?url=https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flowx/flow.zip',
       'https://share-download.onmicrosoft.cn/2025-07-06/flowx-1751766989102.zip',
@@ -19,36 +11,43 @@
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
-        .then(reg => {
+        .then(async reg => {
           console.log('Service Worker 注册成功');
+
+          // 如果已激活，立即尝试下载 ZIP
+          if (navigator.serviceWorker.controller) {
+            await fetchAndCacheZip();
+          } else {
+            // 等待 Service Worker 激活后再尝试下载
+            navigator.serviceWorker.addEventListener('controllerchange', async () => {
+              console.log('Service Worker 已接管');
+              await fetchAndCacheZip();
+            });
+          }
         })
         .catch(err => {
           console.error('Service Worker 注册失败:', err);
+          document.getElementById('status').textContent = 'Service Worker 注册失败';
         });
     } else {
       document.getElementById('status').textContent = '当前浏览器不支持 Service Worker';
     }
 
-    document.getElementById('cacheZipBtn').addEventListener('click', async () => {
-      document.getElementById('status').textContent = '正在尝试下载 ZIP 文件...';
+    async function fetchAndCacheZip() {
+      document.getElementById('status').textContent = '正在自动下载 ZIP 文件...';
       try {
         const arrayBuffer = await tryFetchZip(zipUrls);
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'ZIP_CACHE',
-            arrayBuffer: arrayBuffer
-          });
-          document.getElementById('status').textContent = 'ZIP 数据已发送到 Service Worker，正在缓存...';
-        } else {
-          document.getElementById('status').textContent = 'Service Worker 未激活';
-        }
+        navigator.serviceWorker.controller.postMessage({
+          type: 'ZIP_CACHE',
+          arrayBuffer: arrayBuffer
+        });
+        document.getElementById('status').textContent = 'ZIP 数据已发送到 Service Worker，正在缓存...';
       } catch (err) {
         console.error('所有 ZIP 下载地址都失败了:', err);
         document.getElementById('status').textContent = '所有 ZIP 下载地址都失败了';
       }
-    });
+    }
 
-    // 尝试多地址下载的函数
     async function tryFetchZip(urlList) {
       for (let i = 0; i < urlList.length; i++) {
         try {
@@ -69,8 +68,14 @@
     navigator.serviceWorker.addEventListener('message', event => {
       if (event.data && event.data.status) {
         document.getElementById('status').textContent = event.data.status;
+
+        if (event.data.status === 'ZIP 解压并缓存完成') {
+          console.log('缓存完成，自动刷新页面');
+          setTimeout(() => {
+            location.reload(); // 自动刷新页面
+          }, 500); // 可加一点延迟
+        }
       }
     });
   </script>
 </body>
-</html>

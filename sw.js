@@ -55,6 +55,7 @@ async function cacheZip(arrayBuffer) {
 
 // 拦截 fetch，优先从缓存读取，跳过 ZIP 文件请求
 self.addEventListener('fetch', event => {
+  console.log('Service Worker 拦截:', event.request.url);
   const url = new URL(event.request.url);
 
   // 跳过 ZIP 文件请求，直接走网络，不拦截
