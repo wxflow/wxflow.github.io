@@ -31,7 +31,7 @@ self.addEventListener('message', async (event) => {
   }
 });
 
-// 解压并缓存
+// 解压并缓存 ZIP
 async function cacheZip(arrayBuffer) {
   const zip = await JSZip.loadAsync(arrayBuffer);
   const cache = await caches.open(CACHE_NAME);
@@ -53,30 +53,64 @@ async function cacheZip(arrayBuffer) {
   await Promise.all(cachePromises);
 }
 
-// 拦截 fetch，优先从缓存读取，跳过 ZIP 文件请求
+// 路由映射表
+const routeMapping = {
+  '/': 'index.html',
+  '/ideas': 'ideas.html',
+  '/add': 'add.html',
+  '/admin': 'admin.html'
+};
+
+// 拦截 fetch，处理路由映射
 self.addEventListener('fetch', event => {
   console.log('Service Worker 拦截:', event.request.url);
+
   const url = new URL(event.request.url);
 
-  // 跳过 ZIP 文件请求，直接走网络，不拦截
+  // 跳过 ZIP 文件请求
   if (url.href.includes('flow.zip')) {
-    return; // 不处理
+    return;
   }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          console.log('命中缓存:', event.request.url);
-          return response;
-        }
-        return fetch(event.request);
-      })
-      .catch(err => {
-        console.error('Fetch 失败:', err);
-        return fetch(event.request); // 如果缓存失败，强制兜底请求
-      })
-  );
+  // 检查是否是我们定义的路径
+  if (routeMapping.hasOwnProperty(url.pathname)) {
+    const mappedFile = routeMapping[url.pathname];
+    const mappedUrl = new URL(mappedFile, self.registration.scope).href;
+
+    event.respondWith(
+      caches.match(mappedUrl)
+        .then(response => {
+          if (response) {
+            console.log(`路径 ${url.pathname} 映射到缓存文件 ${mappedFile}`);
+            return response;
+          } else {
+            console.warn(`缓存未找到: ${mappedFile}，尝试网络请求`);
+            return fetch(event.request);
+          }
+        })
+        .catch(err => {
+          console.error('Fetch 失败:', err);
+          return fetch(event.request);
+        })
+    );
+  } else {
+    // 普通请求优先缓存
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => {
+          if (response) {
+            console.log('命中缓存:', event.request.url);
+            return response;
+          }
+          console.log('缓存未命中，尝试网络请求:', event.request.url);
+          return fetch(event.request);
+        })
+        .catch(err => {
+          console.error('Fetch 失败:', err);
+          return fetch(event.request);
+        })
+    );
+  }
 });
 
 // 向所有页面广播消息
