@@ -1,42 +1,55 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <title>swMain Proxy Demo</title>
+  <meta charset="UTF-8">
+  <title>ZIP 缓存解压 Demo</title>
 </head>
 <body>
-  <h1>swMain Proxy Demo</h1>
-  <pre id="output">Loading Service Worker...</pre>
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { scope: './' })
-    .then(registration => {
-      // Service Worker注册成功
-      document.getElementById('output').textContent = 'Service Worker 注册成功，即将刷新页面...';
-      
-      // 检查是否已经有活跃的Service Worker
-      if (registration.active) {
-        // 如果已经有活跃的SW，直接刷新
-        window.location.reload();
-      } else {
-        // 如果没有活跃的SW，等待激活后刷新
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'activated') {
-              // 当Service Worker激活后刷新页面
-              window.location.reload();
-            }
-          });
+  <h1>ZIP 缓存解压 Demo</h1>
+  <button id="cacheZipBtn">下载并缓存 ZIP</button>
+  <p id="status">等待操作...</p>
+
+  <script>
+    // 注册 Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+          console.log('Service Worker 注册成功');
+        })
+        .catch(err => {
+          console.error('Service Worker 注册失败:', err);
         });
+    } else {
+      document.getElementById('status').textContent = '当前浏览器不支持 Service Worker';
+    }
+
+    document.getElementById('cacheZipBtn').addEventListener('click', async () => {
+      document.getElementById('status').textContent = '正在下载 ZIP 文件...';
+      try {
+        const response = await fetch('https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flowx/flow.zip');
+        const arrayBuffer = await response.arrayBuffer();
+
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'ZIP_CACHE',
+            arrayBuffer: arrayBuffer
+          });
+          document.getElementById('status').textContent = 'ZIP 数据已发送到 Service Worker，正在缓存...';
+        } else {
+          document.getElementById('status').textContent = 'Service Worker 未激活';
+        }
+      } catch (err) {
+        console.error('下载 ZIP 失败:', err);
+        document.getElementById('status').textContent = '下载 ZIP 失败';
       }
-    })
-    .catch(err => {
-      document.getElementById('output').textContent = 'Service Worker 注册失败: ' + err;
     });
-} else {
-  document.getElementById('output').textContent = '当前浏览器不支持 Service Worker';
-}
-</script>
+
+    // 监听 Service Worker 日志消息（可选）
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data && event.data.status) {
+        document.getElementById('status').textContent = event.data.status;
+      }
+    });
+  </script>
 </body>
 </html>

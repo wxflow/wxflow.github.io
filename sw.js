@@ -1,49 +1,50 @@
 // sw.js
 
-// 引入 JSZip
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
 
-const CACHE_NAME = 'zip-cache';
-let ZIP_CACHE = 'https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flowx/flow.zip';
+const CACHE_NAME = 'zip-cache-v1';
 
-// 监听 install 事件
+// 立即激活
 self.addEventListener('install', event => {
+  console.log('Service Worker 安装完成');
   self.skipWaiting();
 });
 
-// 监听激活事件
 self.addEventListener('activate', event => {
+  console.log('Service Worker 激活完成');
   event.waitUntil(self.clients.claim());
 });
 
-// 监听消息事件，接收 ZIP 文件
+// 监听消息，接收 zip 的 ArrayBuffer
 self.addEventListener('message', async (event) => {
   if (event.data && event.data.type === 'ZIP_CACHE') {
     try {
-      ZIP_CACHE = event.data.zipBlob;
-      await cacheZip(ZIP_CACHE);
-      console.log('ZIP 文件已缓存并解压。');
+      console.log('收到 ZIP 数据，开始解压...');
+      const zipData = event.data.arrayBuffer;
+      await cacheZip(zipData);
+      console.log('ZIP 解压并缓存完成');
+      sendMessageToClients('ZIP 解压并缓存完成');
     } catch (err) {
       console.error('解压 ZIP 文件失败:', err);
+      sendMessageToClients('解压 ZIP 文件失败');
     }
   }
 });
 
-// 核心：解压 ZIP 并缓存
-async function cacheZip(zipBlob) {
-  const zip = await JSZip.loadAsync(zipBlob);
+// 解压并缓存
+async function cacheZip(arrayBuffer) {
+  const zip = await JSZip.loadAsync(arrayBuffer);
   const cache = await caches.open(CACHE_NAME);
 
   const cachePromises = [];
 
-  // 遍历 ZIP 内所有文件
   zip.forEach((relativePath, zipEntry) => {
     if (!zipEntry.dir) {
       cachePromises.push(
         zipEntry.async('blob').then(fileBlob => {
           const url = new URL(relativePath, self.registration.scope).href;
-          const response = new Response(fileBlob);
-          return cache.put(url, response);
+          console.log('缓存文件:', url);
+          return cache.put(url, new Response(fileBlob));
         })
       );
     }
@@ -52,11 +53,24 @@ async function cacheZip(zipBlob) {
   await Promise.all(cachePromises);
 }
 
-// 代理 fetch 请求，优先从缓存读取
+// 拦截 fetch，优先从缓存读取
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {
-      return response || fetch(event.request);
+      if (response) {
+        console.log('命中缓存:', event.request.url);
+        return response;
+      }
+      return fetch(event.request);
     })
   );
 });
+
+// 向所有页面广播消息
+function sendMessageToClients(message) {
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => {
+      client.postMessage({ status: message });
+    });
+  });
+}
