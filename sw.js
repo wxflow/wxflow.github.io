@@ -61,7 +61,7 @@ const routeMapping = {
   '/admin': 'admin.html'
 };
 
-// 拦截 fetch，处理路由映射、本地缓存、跨域资源
+// 拦截 fetch，处理路由映射、动态缓存
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   console.log('Service Worker 拦截:', url.href);
@@ -71,14 +71,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. 跨域请求，直接走网络
-  if (url.origin !== self.location.origin) {
-    console.log('跨域请求，直接放行:', url.href);
-    return;
-  }
-
-  // 3. 路由映射请求
-  if (routeMapping.hasOwnProperty(url.pathname)) {
+  // 2. 路由映射请求
+  if (url.origin === self.location.origin && routeMapping.hasOwnProperty(url.pathname)) {
     const mappedFile = routeMapping[url.pathname];
     const mappedUrl = new URL(mappedFile, self.registration.scope).href;
 
@@ -101,20 +95,30 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 4. 本地静态资源优先缓存
+  // 3. 其他所有请求，动态缓存（支持跨域）
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        if (response) {
+      .then(cacheResponse => {
+        if (cacheResponse) {
           console.log('命中缓存:', event.request.url);
-          return response;
+          return cacheResponse;
         }
-        console.log('缓存未命中，尝试网络请求:', event.request.url);
-        return fetch(event.request);
-      })
-      .catch(err => {
-        console.error('Fetch 失败:', err);
-        return fetch(event.request);
+
+        console.log('缓存未命中，尝试网络请求并缓存:', event.request.url);
+        return fetch(event.request)
+          .then(networkResponse => {
+            // 如果网络请求成功，写入缓存
+            return caches.open(CACHE_NAME).then(cache => {
+              // 克隆一份 Response 存入缓存
+              cache.put(event.request, networkResponse.clone());
+              console.log('已动态缓存:', event.request.url);
+              return networkResponse;
+            });
+          })
+          .catch(err => {
+            console.error('网络请求失败:', err);
+            throw err;
+          });
       })
   );
 });
