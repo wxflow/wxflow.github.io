@@ -41,6 +41,13 @@
             .animate-progress {
                 animation: progress 2s linear infinite;
             }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
         }
 
         @keyframes float {
@@ -67,7 +74,7 @@
             <!-- 围绕文本框的进度条动画 -->
             <div class="relative mb-6">
                 <div class="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-progress rounded-md blur-sm opacity-70"></div>
-                <div id="console-output" class="relative bg-white p-4 rounded-md overflow-y-auto max-h-64 border border-gray-200">
+                <div id="console-output" class="relative bg-white p-4 rounded-md overflow-y-auto max-h-64 border border-gray-200 scrollbar-hide">
                     <!-- 用于显示 console 输出 -->
                 </div>
             </div>
@@ -76,27 +83,40 @@
         <div class="bg-gray-50 p-4 border-t border-gray-100">
             <div class="flex flex-wrap justify-center items-center text-sm text-gray-500 gap-2">
                 <a href="https://github.com/valetzx/flow-wx" class="hover:underline flex items-center">
-                    <span class="mr-1"></span> 查看项目源码
+                    <span class="mr-1">🔗</span> 查看项目源码
                 </a>
-                <span class="text-gray-300"> · </span>
+                <span class="text-gray-300">|</span>
                 <a href="#" class="hover:underline flex items-center">
-                    <span class="mr-1"></span> 联系我们
+                    <span class="mr-1">📧</span> 联系我们
                 </a>
             </div>
         </div>
     </div>
 
     <script>
-        // 重写 console.log 方法，将输出显示在页面上
+        // 重写 console.log 方法，将输出显示在页面上，添加随机延迟
         const originalConsoleLog = console.log;
         const consoleOutput = document.getElementById('console-output');
         console.log = function(...args) {
             originalConsoleLog.apply(console, args);
-            const logEntry = document.createElement('p');
-            logEntry.textContent = args.join(' ');
-            logEntry.className = 'my-1'; // 添加行间距
-            consoleOutput.appendChild(logEntry);
-            consoleOutput.scrollTop = consoleOutput.scrollHeight; // 自动滚动到最新日志
+            
+            // 生成0.2~0.8秒的随机延迟
+            const randomDelay = 200 + Math.random() * 600;
+            
+            setTimeout(() => {
+                const logEntry = document.createElement('p');
+                logEntry.textContent = args.join(' ');
+                logEntry.className = 'my-1';
+                
+                // 添加到控制台
+                consoleOutput.appendChild(logEntry);
+                
+                // 平滑滚动到底部
+                consoleOutput.scrollTo({
+                    top: consoleOutput.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, randomDelay);
         };
 
         // 添加初始提示
@@ -128,18 +148,12 @@
                 .catch(err => {
                     console.error('Service Worker 注册失败:', err);
                     // 错误提示添加到页面
-                    const statusElement = document.createElement('p');
-                    statusElement.className = 'text-red-500 my-1';
-                    statusElement.textContent = 'Service Worker 注册失败，请检查控制台获取更多信息';
-                    consoleOutput.appendChild(statusElement);
+                    addErrorLog('Service Worker 注册失败，请检查控制台获取更多信息');
                 });
         } else {
             console.error('当前浏览器不支持 Service Worker');
             // 错误提示添加到页面
-            const statusElement = document.createElement('p');
-            statusElement.className = 'text-red-500 my-1';
-            statusElement.textContent = '当前浏览器不支持 Service Worker，无法继续执行';
-            consoleOutput.appendChild(statusElement);
+            addErrorLog('当前浏览器不支持 Service Worker，无法继续执行');
         }
 
         async function fetchAndCacheZip() {
@@ -154,10 +168,7 @@
             } catch (err) {
                 console.error('下载 ZIP 资源地址失败:', err);
                 // 错误提示添加到页面
-                const statusElement = document.createElement('p');
-                statusElement.className = 'text-red-500 my-1';
-                statusElement.textContent = '下载 ZIP 资源地址失败，请检查控制台获取更多信息';
-                consoleOutput.appendChild(statusElement);
+                addErrorLog('下载 ZIP 资源地址失败，请检查控制台获取更多信息');
             }
         }
 
@@ -166,10 +177,7 @@
                 try {
                     console.log(`尝试链接: ${urlList[i]}`);
                     // 显示状态更新
-                    const statusElement = document.createElement('p');
-                    statusElement.className = 'my-1';
-                    statusElement.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>尝试链接: ${i+1}/${urlList.length}`;
-                    consoleOutput.appendChild(statusElement);
+                    addStatusLog(`尝试链接: ${i+1}/${urlList.length}`);
                     
                     const response = await fetch(urlList[i]);
                     if (!response.ok) throw new Error('响应失败: ' + response.status);
@@ -178,10 +186,7 @@
                 } catch (err) {
                     console.warn(`链接失败: ${urlList[i]}`, err);
                     // 显示错误信息
-                    const errorElement = document.createElement('p');
-                    errorElement.className = 'text-yellow-500 my-1';
-                    errorElement.innerHTML = `<span class="inline-block mr-2">⚠️</span>链接失败: ${urlList[i]}`;
-                    consoleOutput.appendChild(errorElement);
+                    addWarningLog(`链接失败: ${urlList[i]}`);
                     
                     if (i === urlList.length - 1) {
                         throw new Error('所有链接地址失败');
@@ -196,25 +201,60 @@
                 console.log(event.data.status);
                 
                 // 显示状态更新
-                const statusElement = document.createElement('p');
-                statusElement.className = 'my-1';
-                statusElement.textContent = event.data.status;
-                consoleOutput.appendChild(statusElement);
+                addStatusLog(event.data.status);
                 
                 if (event.data.status === 'ZIP 解压完成，准备就绪') {
                     console.log('加载完成，自动刷新页面');
                     // 显示完成状态
-                    const successElement = document.createElement('p');
-                    successElement.className = 'text-green-500 font-bold my-2';
-                    successElement.textContent = '✅ 加载完成，准备刷新页面...';
-                    consoleOutput.appendChild(successElement);
+                    addSuccessLog('✅ 加载完成，准备刷新页面...');
                     
                     setTimeout(() => {
                         location.reload(); // 自动刷新页面
-                    }, 500); // 增加一点延迟
+                    }, 1500); // 延长刷新时间，确保用户能看到完成信息
                 }
             }
         });
+
+        // 辅助函数：添加不同类型的日志
+        function addStatusLog(message) {
+            setTimeout(() => {
+                const statusElement = document.createElement('p');
+                statusElement.className = 'my-1';
+                statusElement.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>${message}`;
+                consoleOutput.appendChild(statusElement);
+                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
+            }, 200 + Math.random() * 600);
+        }
+
+        function addWarningLog(message) {
+            setTimeout(() => {
+                const errorElement = document.createElement('p');
+                errorElement.className = 'text-yellow-500 my-1';
+                errorElement.innerHTML = `<span class="inline-block mr-2">⚠️</span>${message}`;
+                consoleOutput.appendChild(errorElement);
+                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
+            }, 200 + Math.random() * 600);
+        }
+
+        function addErrorLog(message) {
+            setTimeout(() => {
+                const statusElement = document.createElement('p');
+                statusElement.className = 'text-red-500 my-1';
+                statusElement.textContent = message;
+                consoleOutput.appendChild(statusElement);
+                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
+            }, 200 + Math.random() * 600);
+        }
+
+        function addSuccessLog(message) {
+            setTimeout(() => {
+                const successElement = document.createElement('p');
+                successElement.className = 'text-green-500 font-bold my-2';
+                successElement.textContent = message;
+                consoleOutput.appendChild(successElement);
+                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
+            }, 200 + Math.random() * 600);
+        }
     </script>
 </body>
 </html>
