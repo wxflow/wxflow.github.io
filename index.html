@@ -66,7 +66,7 @@
     <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden">
         <div class="bg-primary/5 p-6 border-b border-gray-100">
             <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-800 text-center text-shadow">
-                ZIP 资源加载
+                博客加载中
             </h1>
         </div>
         
@@ -83,40 +83,35 @@
         <div class="bg-gray-50 p-4 border-t border-gray-100">
             <div class="flex flex-wrap justify-center items-center text-sm text-gray-500 gap-2">
                 <a href="https://github.com/valetzx/flow-wx" class="hover:underline flex items-center">
-                    <span class="mr-1">🔗</span> 查看项目源码
+                    <span class="mr-1"></span> 查看项目源码
                 </a>
-                <span class="text-gray-300">|</span>
+                <span class="text-gray-300"> · </span>
                 <a href="#" class="hover:underline flex items-center">
-                    <span class="mr-1">📧</span> 联系我们
+                    <span class="mr-1"></span> 联系我们
                 </a>
             </div>
         </div>
     </div>
 
     <script>
-        // 重写 console.log 方法，将输出显示在页面上，添加随机延迟
+        // 日志队列和处理状态
+        const logQueue = [];
+        let isProcessingLog = false;
+        
+        // 重写 console.log 方法，将输出添加到队列
         const originalConsoleLog = console.log;
         const consoleOutput = document.getElementById('console-output');
         console.log = function(...args) {
             originalConsoleLog.apply(console, args);
             
-            // 生成0.2~0.8秒的随机延迟
-            const randomDelay = 200 + Math.random() * 600;
+            // 添加到日志队列
+            logQueue.push({
+                type: 'normal',
+                message: args.join(' ')
+            });
             
-            setTimeout(() => {
-                const logEntry = document.createElement('p');
-                logEntry.textContent = args.join(' ');
-                logEntry.className = 'my-1';
-                
-                // 添加到控制台
-                consoleOutput.appendChild(logEntry);
-                
-                // 平滑滚动到底部
-                consoleOutput.scrollTo({
-                    top: consoleOutput.scrollHeight,
-                    behavior: 'smooth'
-                });
-            }, randomDelay);
+            // 开始处理队列
+            processLogQueue();
         };
 
         // 添加初始提示
@@ -147,13 +142,13 @@
                 })
                 .catch(err => {
                     console.error('Service Worker 注册失败:', err);
-                    // 错误提示添加到页面
-                    addErrorLog('Service Worker 注册失败，请检查控制台获取更多信息');
+                    // 错误提示添加到队列
+                    addLogToQueue('error', 'Service Worker 注册失败，请检查控制台获取更多信息');
                 });
         } else {
             console.error('当前浏览器不支持 Service Worker');
-            // 错误提示添加到页面
-            addErrorLog('当前浏览器不支持 Service Worker，无法继续执行');
+            // 错误提示添加到队列
+            addLogToQueue('error', '当前浏览器不支持 Service Worker，无法继续执行');
         }
 
         async function fetchAndCacheZip() {
@@ -167,8 +162,8 @@
                 console.log('ZIP 数据已发送到 Service Worker，正在解压...');
             } catch (err) {
                 console.error('下载 ZIP 资源地址失败:', err);
-                // 错误提示添加到页面
-                addErrorLog('下载 ZIP 资源地址失败，请检查控制台获取更多信息');
+                // 错误提示添加到队列
+                addLogToQueue('error', '下载 ZIP 资源地址失败，请检查控制台获取更多信息');
             }
         }
 
@@ -177,7 +172,7 @@
                 try {
                     console.log(`尝试链接: ${urlList[i]}`);
                     // 显示状态更新
-                    addStatusLog(`尝试链接: ${i+1}/${urlList.length}`);
+                    addLogToQueue('status', `尝试链接: ${i+1}/${urlList.length}`);
                     
                     const response = await fetch(urlList[i]);
                     if (!response.ok) throw new Error('响应失败: ' + response.status);
@@ -186,7 +181,7 @@
                 } catch (err) {
                     console.warn(`链接失败: ${urlList[i]}`, err);
                     // 显示错误信息
-                    addWarningLog(`链接失败: ${urlList[i]}`);
+                    addLogToQueue('warning', `链接失败: ${urlList[i]}`);
                     
                     if (i === urlList.length - 1) {
                         throw new Error('所有链接地址失败');
@@ -201,59 +196,93 @@
                 console.log(event.data.status);
                 
                 // 显示状态更新
-                addStatusLog(event.data.status);
+                addLogToQueue('status', event.data.status);
                 
-                if (event.data.status === 'ZIP 解压完成，准备就绪') {
+                if (event.data.status === 'ZIP 解压并缓存完成') {
                     console.log('加载完成，自动刷新页面');
                     // 显示完成状态
-                    addSuccessLog('✅ 加载完成，准备刷新页面...');
+                    addLogToQueue('success', '✅ 加载完成，准备刷新页面...');
                     
-                    setTimeout(() => {
-                        location.reload(); // 自动刷新页面
-                    }, 1500); // 延长刷新时间，确保用户能看到完成信息
+                    // 使用队列处理刷新，确保在所有日志显示后执行
+                    addLogToQueue('refresh', '');
                 }
             }
         });
 
-        // 辅助函数：添加不同类型的日志
-        function addStatusLog(message) {
-            setTimeout(() => {
-                const statusElement = document.createElement('p');
-                statusElement.className = 'my-1';
-                statusElement.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>${message}`;
-                consoleOutput.appendChild(statusElement);
-                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
-            }, 200 + Math.random() * 600);
+        // 辅助函数：添加日志到队列
+        function addLogToQueue(type, message) {
+            logQueue.push({ type, message });
+            processLogQueue();
         }
 
-        function addWarningLog(message) {
+        // 处理日志队列
+        function processLogQueue() {
+            // 如果正在处理队列，不重复处理
+            if (isProcessingLog || logQueue.length === 0) return;
+            
+            isProcessingLog = true;
+            const logEntry = logQueue.shift();
+            
+            // 生成0.2~0.8秒的随机延迟
+            const randomDelay = 200 + Math.random() * 600;
+            
             setTimeout(() => {
-                const errorElement = document.createElement('p');
-                errorElement.className = 'text-yellow-500 my-1';
-                errorElement.innerHTML = `<span class="inline-block mr-2">⚠️</span>${message}`;
-                consoleOutput.appendChild(errorElement);
-                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
-            }, 200 + Math.random() * 600);
-        }
-
-        function addErrorLog(message) {
-            setTimeout(() => {
-                const statusElement = document.createElement('p');
-                statusElement.className = 'text-red-500 my-1';
-                statusElement.textContent = message;
-                consoleOutput.appendChild(statusElement);
-                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
-            }, 200 + Math.random() * 600);
-        }
-
-        function addSuccessLog(message) {
-            setTimeout(() => {
-                const successElement = document.createElement('p');
-                successElement.className = 'text-green-500 font-bold my-2';
-                successElement.textContent = message;
-                consoleOutput.appendChild(successElement);
-                consoleOutput.scrollTo({ top: consoleOutput.scrollHeight, behavior: 'smooth' });
-            }, 200 + Math.random() * 600);
+                let logElement;
+                
+                switch(logEntry.type) {
+                    case 'status':
+                        logElement = document.createElement('p');
+                        logElement.className = 'my-1';
+                        logElement.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>${logEntry.message}`;
+                        break;
+                        
+                    case 'warning':
+                        logElement = document.createElement('p');
+                        logElement.className = 'text-yellow-500 my-1';
+                        logElement.innerHTML = `<span class="inline-block mr-2">⚠️</span>${logEntry.message}`;
+                        break;
+                        
+                    case 'error':
+                        logElement = document.createElement('p');
+                        logElement.className = 'text-red-500 my-1';
+                        logElement.textContent = logEntry.message;
+                        break;
+                        
+                    case 'success':
+                        logElement = document.createElement('p');
+                        logElement.className = 'text-green-500 font-bold my-2';
+                        logElement.textContent = logEntry.message;
+                        break;
+                        
+                    case 'refresh':
+                        // 等待1.5秒后刷新页面
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
+                        isProcessingLog = false;
+                        return;
+                        
+                    default:
+                        logElement = document.createElement('p');
+                        logElement.className = 'my-1';
+                        logElement.textContent = logEntry.message;
+                }
+                
+                // 添加到控制台
+                if (logElement) {
+                    consoleOutput.appendChild(logElement);
+                    
+                    // 平滑滚动到底部
+                    consoleOutput.scrollTo({
+                        top: consoleOutput.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+                
+                // 处理下一条日志
+                isProcessingLog = false;
+                processLogQueue();
+            }, randomDelay);
         }
     </script>
 </body>
