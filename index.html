@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>swMain Proxy Demo</title>
+</head>
+<body>
+  <h1>swMain Proxy Demo</h1>
+  <pre id="output">Loading Service Worker...</pre>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js', { scope: './' })
+    .then(registration => {
+      // Service Worker注册成功
+      document.getElementById('output').textContent = 'Service Worker 注册成功，即将刷新页面...';
+      
+      // 检查是否已经有活跃的Service Worker
+      if (registration.active) {
+        // 如果已经有活跃的SW，直接刷新
+        window.location.reload();
+      } else {
+        // 如果没有活跃的SW，等待激活后刷新
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              // 当Service Worker激活后刷新页面
+              window.location.reload();
+            }
+          });
+        });
+      }
+    })
+    .catch(err => {
+      document.getElementById('output').textContent = 'Service Worker 注册失败: ' + err;
+    });
+} else {
+  document.getElementById('output').textContent = '当前浏览器不支持 Service Worker';
+}
+</script>
+</body>
+</html>
