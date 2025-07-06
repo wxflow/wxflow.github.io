@@ -2,15 +2,21 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>ZIP 缓存解压 Demo</title>
+  <title>ZIP 多源缓存 Demo</title>
 </head>
 <body>
-  <h1>ZIP 缓存解压 Demo</h1>
+  <h1>ZIP 多源缓存 Demo</h1>
   <button id="cacheZipBtn">下载并缓存 ZIP</button>
   <p id="status">等待操作...</p>
 
   <script>
-    // 注册 Service Worker
+    // ZIP 备用地址列表
+    const zipUrls = [
+      'https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flowx/flow.zip',
+      'https://cnb.cool/valetzx/flow-wx/-/releases/download/v1.0.0/flowx.zip',
+      'https://cnb.cool/valetzx/static/-/git/raw/main/flowx_flow.zip'
+    ];
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
         .then(reg => {
@@ -24,11 +30,9 @@
     }
 
     document.getElementById('cacheZipBtn').addEventListener('click', async () => {
-      document.getElementById('status').textContent = '正在下载 ZIP 文件...';
+      document.getElementById('status').textContent = '正在尝试下载 ZIP 文件...';
       try {
-        const response = await fetch('https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flowx/flow.zip');
-        const arrayBuffer = await response.arrayBuffer();
-
+        const arrayBuffer = await tryFetchZip(zipUrls);
         if (navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'ZIP_CACHE',
@@ -39,12 +43,29 @@
           document.getElementById('status').textContent = 'Service Worker 未激活';
         }
       } catch (err) {
-        console.error('下载 ZIP 失败:', err);
-        document.getElementById('status').textContent = '下载 ZIP 失败';
+        console.error('所有 ZIP 下载地址都失败了:', err);
+        document.getElementById('status').textContent = '所有 ZIP 下载地址都失败了';
       }
     });
 
-    // 监听 Service Worker 日志消息（可选）
+    // 尝试多地址下载的函数
+    async function tryFetchZip(urlList) {
+      for (let i = 0; i < urlList.length; i++) {
+        try {
+          console.log(`尝试下载: ${urlList[i]}`);
+          const response = await fetch(urlList[i]);
+          if (!response.ok) throw new Error('响应失败: ' + response.status);
+          return await response.arrayBuffer();
+        } catch (err) {
+          console.warn(`下载失败: ${urlList[i]}`, err);
+          if (i === urlList.length - 1) {
+            throw new Error('所有下载地址都失败了');
+          }
+        }
+      }
+    }
+
+    // 监听 Service Worker 消息
     navigator.serviceWorker.addEventListener('message', event => {
       if (event.data && event.data.status) {
         document.getElementById('status').textContent = event.data.status;
