@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZIP 资源加载 Demo</title>
+    <title>金桔猪的博客</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -74,7 +74,7 @@
             <!-- 围绕文本框的进度条动画 -->
             <div class="relative mb-6">
                 <div class="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-progress rounded-md blur-sm opacity-70"></div>
-                <div id="console-output" class="relative bg-white p-4 rounded-md overflow-y-auto max-h-64 border border-gray-200 scrollbar-hide">
+                <div id="console-output" class="relative bg-white p-4 rounded-md overflow-y-auto h-[480px] border border-gray-200 scrollbar-hide">
                     <!-- 用于显示 console 输出 -->
                 </div>
             </div>
@@ -224,7 +224,7 @@
             const logEntry = logQueue.shift();
             
             // 生成0.2~0.8秒的随机延迟
-            const randomDelay = 200 + Math.random() * 600;
+            const randomDelay = 120 + Math.random() * 300;
             
             setTimeout(() => {
                 let logElement;
@@ -258,7 +258,7 @@
                         // 等待1.5秒后刷新页面
                         setTimeout(() => {
                             location.reload();
-                        }, 1500);
+                        }, 1320);
                         isProcessingLog = false;
                         return;
                         
@@ -287,3 +287,4 @@
     </script>
 </body>
 </html>
+    
