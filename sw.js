@@ -61,18 +61,23 @@ const routeMapping = {
   '/admin': 'admin.html'
 };
 
-// 拦截 fetch，处理路由映射
+// 拦截 fetch，处理路由映射、本地缓存、跨域资源
 self.addEventListener('fetch', event => {
-  console.log('Service Worker 拦截:', event.request.url);
-
   const url = new URL(event.request.url);
+  console.log('Service Worker 拦截:', url.href);
 
-  // 跳过 ZIP 文件请求
+  // 1. 跳过 ZIP 文件请求
   if (url.href.includes('flow.zip')) {
     return;
   }
 
-  // 检查是否是我们定义的路径
+  // 2. 跨域请求，直接走网络
+  if (url.origin !== self.location.origin) {
+    console.log('跨域请求，直接放行:', url.href);
+    return;
+  }
+
+  // 3. 路由映射请求
   if (routeMapping.hasOwnProperty(url.pathname)) {
     const mappedFile = routeMapping[url.pathname];
     const mappedUrl = new URL(mappedFile, self.registration.scope).href;
@@ -93,24 +98,25 @@ self.addEventListener('fetch', event => {
           return fetch(event.request);
         })
     );
-  } else {
-    // 普通请求优先缓存
-    event.respondWith(
-      caches.match(event.request)
-        .then(response => {
-          if (response) {
-            console.log('命中缓存:', event.request.url);
-            return response;
-          }
-          console.log('缓存未命中，尝试网络请求:', event.request.url);
-          return fetch(event.request);
-        })
-        .catch(err => {
-          console.error('Fetch 失败:', err);
-          return fetch(event.request);
-        })
-    );
+    return;
   }
+
+  // 4. 本地静态资源优先缓存
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          console.log('命中缓存:', event.request.url);
+          return response;
+        }
+        console.log('缓存未命中，尝试网络请求:', event.request.url);
+        return fetch(event.request);
+      })
+      .catch(err => {
+        console.error('Fetch 失败:', err);
+        return fetch(event.request);
+      })
+  );
 });
 
 // 向所有页面广播消息
