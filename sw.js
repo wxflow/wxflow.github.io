@@ -4,7 +4,7 @@
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
 
 const CACHE_NAME = 'zip-cache';
-let ZIP_CACHE = null;
+let ZIP_CACHE = 'https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flowx/flow.zip';
 
 // 监听 install 事件
 self.addEventListener('install', event => {
