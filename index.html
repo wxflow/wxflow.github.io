@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZIP 多源缓存 Demo</title>
+    <title>ZIP 资源加载 Demo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -38,6 +38,9 @@
             .text-shadow {
                 text-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
+            .animate-progress {
+                animation: progress 2s linear infinite;
+            }
         }
 
         @keyframes float {
@@ -45,57 +48,61 @@
             50% { transform: translateY(-10px); }
             100% { transform: translateY(0px); }
         }
+
+        @keyframes progress {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-inter flex flex-col items-center justify-center p-4">
     <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden">
         <div class="bg-primary/5 p-6 border-b border-gray-100">
             <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-800 text-center text-shadow">
-                </span>ZIP 多源缓存
+                ZIP 资源加载
             </h1>
         </div>
         
         <div class="p-6 md:p-8">
-            <!-- 加载动画容器 -->
-            <div id="loader-container" class="flex flex-col items-center justify-center py-12">
-                <div class="relative mb-6">
-                    <div class="w-24 h-24 rounded-full border-4 border-primary/20 border-t-primary animate-spin-slow"></div>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <span class="text-4xl font-bold text-primary animate-float">ZIP</span>
-                    </div>
-                </div>
-                
-                <p id="status" class="text-lg font-medium text-gray-700 animate-pulse-slow">
-                    <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>正在初始化...
-                </p>
-                
-                <div class="mt-8 w-full max-w-md">
-                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div id="progress-bar" class="h-full bg-gradient-to-r from-primary to-secondary w-0 transition-all duration-500"></div>
-                    </div>
-                </div>
-                
-                <div class="mt-4 flex items-center justify-between w-full max-w-md">
-                    <div class="flex items-center">
-                        <div class="w-3 h-3 rounded-full bg-primary/20 mr-2"></div>
-                        <div class="w-3 h-3 rounded-full bg-primary/40 mr-2"></div>
-                        <div class="w-3 h-3 rounded-full bg-primary/60 mr-2"></div>
-                        <div class="w-3 h-3 rounded-full bg-primary"></div>
-                    </div>
-                    <p id="progress-text" class="text-sm text-gray-500">0%</p>
+            <!-- 围绕文本框的进度条动画 -->
+            <div class="relative mb-6">
+                <div class="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-progress rounded-md blur-sm opacity-70"></div>
+                <div id="console-output" class="relative bg-white p-4 rounded-md overflow-y-auto max-h-64 border border-gray-200">
+                    <!-- 用于显示 console 输出 -->
                 </div>
             </div>
         </div>
         
         <div class="bg-gray-50 p-4 border-t border-gray-100">
-            <div class="flex flex-col items-center text-sm text-gray-500">
-                <a href="https://github.com/valetzx/flow-wx" class="hover:underline">查看项目源码 </a> · <a href="#">联系我吧</a>
+            <div class="flex flex-wrap justify-center items-center text-sm text-gray-500 gap-2">
+                <a href="https://github.com/valetzx/flow-wx" class="hover:underline flex items-center">
+                    <span class="mr-1"></span> 查看项目源码
+                </a>
+                <span class="text-gray-300"> · </span>
+                <a href="#" class="hover:underline flex items-center">
+                    <span class="mr-1"></span> 联系我们
+                </a>
             </div>
         </div>
     </div>
 
     <script>
-        // 你原有的script代码，保持不变
+        // 重写 console.log 方法，将输出显示在页面上
+        const originalConsoleLog = console.log;
+        const consoleOutput = document.getElementById('console-output');
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const logEntry = document.createElement('p');
+            logEntry.textContent = args.join(' ');
+            logEntry.className = 'my-1'; // 添加行间距
+            consoleOutput.appendChild(logEntry);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight; // 自动滚动到最新日志
+        };
+
+        // 添加初始提示
+        console.log('正在初始化环境...');
+        console.log('尝试注册 Service Worker...');
+
         const zipUrls = [
             'https://m.wbiao.cn/mallapi/wechat/picReverseUrl?url=https://db0kqspitke0bs.database.nocode.cn/storage/v1/object/public/flow/flow.zip',
             'https://share-download.onmicrosoft.cn/2025-07-06/flowx-1751766989102.zip',
@@ -107,81 +114,77 @@
                 .then(async reg => {
                     console.log('Service Worker 注册成功');
 
-                    // 如果已激活，立即尝试下载 ZIP
+                    // 如果已经有控制器，立即下载 ZIP
                     if (navigator.serviceWorker.controller) {
                         await fetchAndCacheZip();
                     } else {
-                        // 等待 Service Worker 激活后再尝试下载
+                        // 等待 Service Worker 激活后再下载
                         navigator.serviceWorker.addEventListener('controllerchange', async () => {
-                            console.log('Service Worker 已接管');
+                            console.log('Service Worker 已激活');
                             await fetchAndCacheZip();
                         });
                     }
                 })
                 .catch(err => {
                     console.error('Service Worker 注册失败:', err);
-                    document.getElementById('status').textContent = 'Service Worker 注册失败';
+                    // 错误提示添加到页面
+                    const statusElement = document.createElement('p');
+                    statusElement.className = 'text-red-500 my-1';
+                    statusElement.textContent = 'Service Worker 注册失败，请检查控制台获取更多信息';
+                    consoleOutput.appendChild(statusElement);
                 });
         } else {
-            document.getElementById('status').textContent = '当前浏览器不支持 Service Worker';
+            console.error('当前浏览器不支持 Service Worker');
+            // 错误提示添加到页面
+            const statusElement = document.createElement('p');
+            statusElement.className = 'text-red-500 my-1';
+            statusElement.textContent = '当前浏览器不支持 Service Worker，无法继续执行';
+            consoleOutput.appendChild(statusElement);
         }
 
         async function fetchAndCacheZip() {
-            document.getElementById('status').textContent = '正在自动下载 ZIP 文件...';
+            console.log('开始自动下载 ZIP 文件...');
             try {
                 const arrayBuffer = await tryFetchZip(zipUrls);
                 navigator.serviceWorker.controller.postMessage({
                     type: 'ZIP_CACHE',
                     arrayBuffer: arrayBuffer
                 });
-                document.getElementById('status').textContent = 'ZIP 数据已发送到 Service Worker，正在缓存...';
+                console.log('ZIP 数据已发送到 Service Worker，正在解压...');
             } catch (err) {
-                console.error('所有 ZIP 下载地址都失败了:', err);
-                document.getElementById('status').textContent = '所有 ZIP 下载地址都失败了';
+                console.error('下载 ZIP 资源地址失败:', err);
+                // 错误提示添加到页面
+                const statusElement = document.createElement('p');
+                statusElement.className = 'text-red-500 my-1';
+                statusElement.textContent = '下载 ZIP 资源地址失败，请检查控制台获取更多信息';
+                consoleOutput.appendChild(statusElement);
             }
         }
 
         async function tryFetchZip(urlList) {
             for (let i = 0; i < urlList.length; i++) {
                 try {
-                    console.log(`尝试下载: ${urlList[i]}`);
-                    updateStatus(`尝试下载: ${i+1}/${urlList.length}`);
+                    console.log(`尝试链接: ${urlList[i]}`);
+                    // 显示状态更新
+                    const statusElement = document.createElement('p');
+                    statusElement.className = 'my-1';
+                    statusElement.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>尝试链接: ${i+1}/${urlList.length}`;
+                    consoleOutput.appendChild(statusElement);
+                    
                     const response = await fetch(urlList[i]);
                     if (!response.ok) throw new Error('响应失败: ' + response.status);
                     
-                    // 添加下载进度更新
-                    const contentLength = response.headers.get('content-length');
-                    if (contentLength) {
-                        const total = parseInt(contentLength, 10);
-                        let loaded = 0;
-                        
-                        const reader = response.body.getReader();
-                        const chunks = [];
-                        
-                        updateStatus(`正在下载: ${i+1}/${urlList.length}`);
-                        
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            
-                            if (done) {
-                                break;
-                            }
-                            
-                            chunks.push(value);
-                            loaded += value.length;
-                            const progress = Math.round((loaded / total) * 100);
-                            updateProgress(progress);
-                        }
-                        
-                        return new Blob(chunks).arrayBuffer();
-                    }
-                    
                     return await response.arrayBuffer();
                 } catch (err) {
-                    console.warn(`下载失败: ${urlList[i]}`, err);
-                    updateStatus(`下载失败: ${i+1}/${urlList.length}`);
+                    console.warn(`链接失败: ${urlList[i]}`, err);
+                    // 显示错误信息
+                    const errorElement = document.createElement('p');
+                    errorElement.className = 'text-yellow-500 my-1';
+                    errorElement.innerHTML = `<span class="inline-block mr-2">⚠️</span>链接失败: ${urlList[i]}`;
+                    consoleOutput.appendChild(errorElement);
+                    
                     if (i === urlList.length - 1) {
-                        throw new Error('所有下载地址都失败了');
+                        throw new Error('所有链接地址失败');
                     }
                 }
             }
@@ -190,38 +193,28 @@
         // 监听 Service Worker 消息
         navigator.serviceWorker.addEventListener('message', event => {
             if (event.data && event.data.status) {
-                document.getElementById('status').textContent = event.data.status;
+                console.log(event.data.status);
                 
-                if (event.data.progress !== undefined) {
-                    updateProgress(event.data.progress);
-                }
-
-                if (event.data.status === 'ZIP 解压并缓存完成') {
-                    console.log('缓存完成，自动刷新页面');
+                // 显示状态更新
+                const statusElement = document.createElement('p');
+                statusElement.className = 'my-1';
+                statusElement.textContent = event.data.status;
+                consoleOutput.appendChild(statusElement);
+                
+                if (event.data.status === 'ZIP 解压完成，准备就绪') {
+                    console.log('加载完成，自动刷新页面');
+                    // 显示完成状态
+                    const successElement = document.createElement('p');
+                    successElement.className = 'text-green-500 font-bold my-2';
+                    successElement.textContent = '✅ 加载完成，准备刷新页面...';
+                    consoleOutput.appendChild(successElement);
+                    
                     setTimeout(() => {
                         location.reload(); // 自动刷新页面
-                    }, 500); // 可加一点延迟
+                    }, 500); // 增加一点延迟
                 }
             }
         });
-        
-        // 添加进度更新辅助函数
-        function updateProgress(progress) {
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-            
-            if (progressBar && progressText) {
-                progressBar.style.width = `${progress}%`;
-                progressText.textContent = `${progress}%`;
-            }
-        }
-        
-        function updateStatus(message) {
-            const statusElement = document.getElementById('status');
-            if (statusElement) {
-                statusElement.innerHTML = `<span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-primary rounded-full animate-spin mr-2"></span>${message}`;
-            }
-        }
     </script>
 </body>
-</html>    
+</html>
